@@ -1,5 +1,8 @@
-// Re-export Prisma-generated enums for use across the app
-export type { InvoiceStatus, DocType, PaymentMethod, PartyType } from "@prisma/client";
+// Enum-equivalent string literal types (enums removed for SQL Server compatibility)
+export type InvoiceStatus = "DRAFT" | "UNPAID" | "PARTIAL" | "PAID" | "CANCELLED";
+export type DocType = "INVOICE" | "ESTIMATE" | "PURCHASE" | "CREDIT_NOTE" | "DEBIT_NOTE";
+export type PaymentMethod = "UPI" | "CASH" | "BANK" | "CHEQUE" | "OTHER";
+export type PartyType = "CUSTOMER" | "SUPPLIER" | "BOTH";
 
 // ─── API Response Types ───────────────────────────────────────────────────────
 
