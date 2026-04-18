@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const SECRET = process.env.AUTH_SECRET;
 
   if (!SECRET) {
