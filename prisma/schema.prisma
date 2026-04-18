@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model GstConfig {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.NVarChar(100)
+  cgstRate    Decimal   @default(0) @db.Decimal(5, 2) @map("cgst_rate")
+  sgstRate    Decimal   @default(0) @db.Decimal(5, 2) @map("sgst_rate")
+  igstRate    Decimal   @default(0) @db.Decimal(5, 2) @map("igst_rate")
+  cessRate    Decimal   @default(0) @db.Decimal(5, 2) @map("cess_rate")
+  cessEnabled Boolean   @default(false) @map("cess_enabled")
+  products    Product[]
+
+  @@map("gst_config")
+}
+
+model Product {
+  id                 Int           @id @default(autoincrement())
+  sku                String        @unique @db.NVarChar(50)
+  name               String        @db.NVarChar(255)
+  hsnCode            String        @db.NVarChar(8) @map("hsn_code")
+  basePrice          Decimal       @db.Decimal(15, 2) @map("base_price")
+  taxInclusive       Boolean       @default(false) @map("tax_inclusive")
+  gstConfigId        Int           @map("gst_config_id")
+  stockQty           Decimal       @default(0) @db.Decimal(10, 3) @map("stock_qty")
+  lowStockAlert      Decimal       @default(10) @db.Decimal(10, 3) @map("low_stock_alert")
+  allowNegativeStock Boolean       @default(false) @map("allow_negative_stock")
+  unit               String        @default("PCS") @db.NVarChar(20)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  gstConfig          GstConfig     @relation(fields: [gstConfigId], references: [id])
+  invoiceItems       InvoiceItem[]
+
+  @@index([hsnCode])
+  @@map("products")
+}
+
+model Party {
+  id             Int       @id @default(autoincrement())
+  type           String    @default("CUSTOMER")
+  name           String    @db.NVarChar(255)
+  gstin          String?   @unique @db.NVarChar(15)
+  phone          String?   @db.NVarChar(15)
+  email          String?   @db.NVarChar(255)
+  address        String?   @db.NVarChar(Max)
+  stateCode      String    @db.NChar(2) @map("state_code")
+  stateName      String    @db.NVarChar(50) @map("state_name")
+  currentBalance Decimal   @default(0) @db.Decimal(15, 2) @map("current_balance")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+  invoices       Invoice[]
+
+  @@index([name])
+  @@index([type])
+  @@unique([name, phone])
+  @@map("parties")
+}
+
+model DocSequence {
+  id            Int    @id @default(autoincrement())
+  prefix        String @db.NVarChar(10)
+  financialYear String @db.NVarChar(7) @map("financial_year")
+  lastNumber    Int    @default(0) @map("last_number")
+
+  @@unique([prefix, financialYear])
+  @@map("doc_sequences")
+}
+
+model Invoice {
+  id                 Int           @id @default(autoincrement())
+  docNumber          String        @unique @db.NVarChar(30) @map("doc_number")
+  docType            String        @default("INVOICE") @map("doc_type")
+  date               DateTime      @db.Date
+  dueDate            DateTime?     @db.Date @map("due_date")
+  partyId            Int           @map("party_id")
+  partyStateCode     String        @db.NChar(2) @map("party_state_code")
+  businessStateCode  String        @db.NChar(2) @map("business_state_code")
+  subtotal           Decimal       @default(0) @db.Decimal(15, 2)
+  cgstTotal          Decimal       @default(0) @db.Decimal(15, 2) @map("cgst_total")
+  sgstTotal          Decimal       @default(0) @db.Decimal(15, 2) @map("sgst_total")
+  igstTotal          Decimal       @default(0) @db.Decimal(15, 2) @map("igst_total")
+  cessTotal          Decimal       @default(0) @db.Decimal(15, 2) @map("cess_total")
+  totalAmount        Decimal       @default(0) @db.Decimal(15, 2) @map("total_amount")
+  balanceDue         Decimal       @default(0) @db.Decimal(15, 2) @map("balance_due")
+  status             String        @default("DRAFT")
+  financialYear      String?       @db.NVarChar(10) @map("financial_year")
+  notes              String?       @db.NVarChar(Max)
+  affectStock        Boolean       @default(true) @map("affect_stock")
+  ledgerAccountId    Int?          @map("ledger_account_id")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  deletedAt          DateTime?     @map("deleted_at")
+  party              Party         @relation(fields: [partyId], references: [id])
+  ledgerAccount      LedgerAccount? @relation(fields: [ledgerAccountId], references: [id])
+  items              InvoiceItem[]
+  payments           Payment[]
+
+  @@index([partyId])
+  @@index([status])
+  @@index([date])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id           Int     @id @default(autoincrement())
+  invoiceId    Int     @map("invoice_id")
+  productId    Int     @map("product_id")
+  qty          Decimal @db.Decimal(10, 3)
+  unitPrice    Decimal @db.Decimal(15, 2) @map("unit_price")
+  discountPct  Decimal @default(0) @db.Decimal(5, 2) @map("discount_pct")
+  taxableValue Decimal @db.Decimal(15, 2) @map("taxable_value")
+  cgstPct      Decimal @default(0) @db.Decimal(5, 2) @map("cgst_pct")
+  sgstPct      Decimal @default(0) @db.Decimal(5, 2) @map("sgst_pct")
+  igstPct      Decimal @default(0) @db.Decimal(5, 2) @map("igst_pct")
+  cessPct      Decimal @default(0) @db.Decimal(5, 2) @map("cess_pct")
+  cgstAmount   Decimal @default(0) @db.Decimal(15, 2) @map("cgst_amount")
+  sgstAmount   Decimal @default(0) @db.Decimal(15, 2) @map("sgst_amount")
+  igstAmount   Decimal @default(0) @db.Decimal(15, 2) @map("igst_amount")
+  cessAmount   Decimal @default(0) @db.Decimal(15, 2) @map("cess_amount")
+  taxTotal     Decimal @default(0) @db.Decimal(15, 2) @map("tax_total")
+  lineTotal    Decimal @db.Decimal(15, 2) @map("line_total")
+  invoice      Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@index([productId])
+  @@map("invoice_items")
+}
+
+model BankAccount {
+  id            Int       @id @default(autoincrement())
+  accountName   String    @db.NVarChar(100) @map("account_name")
+  bankName      String    @db.NVarChar(100) @map("bank_name")
+  accountNumber String    @db.NVarChar(20) @map("account_number")
+  ifscCode      String    @db.NVarChar(11) @map("ifsc_code")
+  balance       Decimal   @default(0) @db.Decimal(15, 2)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  payments      Payment[]
+
+  @@map("bank_accounts")
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  invoiceId     Int           @map("invoice_id")
+  paymentDate   DateTime      @db.Date @map("payment_date")
+  amountPaid    Decimal       @db.Decimal(15, 2) @map("amount_paid")
+  paymentMethod String        @map("payment_method")
+  referenceId   String?       @db.NVarChar(100) @map("reference_id")
+  note          String?       @db.NVarChar(Max)
+  bankAccountId Int?          @map("bank_account_id")
+  ledgerAccountId Int?        @map("ledger_account_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  invoice       Invoice        @relation(fields: [invoiceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bankAccount   BankAccount?   @relation(fields: [bankAccountId], references: [id])
+  ledgerAccount LedgerAccount? @relation(fields: [ledgerAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([invoiceId])
+  @@index([paymentDate])
+  @@index([bankAccountId])
+  @@map("payments")
+}
+
+model GstAdjustment {
+  id            Int               @id @default(autoincrement())
+  date          DateTime          @db.Date
+  amount        Decimal           @db.Decimal(15, 2)
+  type          String
+  description   String            @db.NVarChar(255)
+  financialYear String            @db.NVarChar(10)            @map("financial_year")
+  createdAt     DateTime          @default(now())            @map("created_at")
+
+  @@index([financialYear])
+  @@map("gst_adjustments")
+}
+
+model LedgerAccount {
+  id             Int       @id @default(autoincrement())
+  name           String    @db.NVarChar(255)
+  type           String
+  group          String?   @db.NVarChar(100) // e.g., "Current Assets", "Fixed Assets", "Direct Expenses"
+  openingBalance Decimal   @default(0) @db.Decimal(15, 2) @map("opening_balance")
+  currentBalance Decimal   @default(0) @db.Decimal(15, 2) @map("current_balance")
+  isBank         Boolean   @default(false) @map("is_bank")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  journalEntries JournalEntry[]
+  invoices       Invoice[]
+  payments       Payment[]
+
+  @@unique([name])
+  @@map("ledger_accounts")
+}
+
+model JournalEntry {
+  id            Int       @id @default(autoincrement())
+  date          DateTime  @db.Date
+  accountId     Int       @map("account_id")
+  amount        Decimal   @db.Decimal(15, 2)
+  type          String
+  referenceType String?   @db.NVarChar(50) // "INVOICE", "PAYMENT", "DEPRECIATION", "MANUAL"
+  referenceId   Int?      @map("reference_id")
+  description   String?   @db.NVarChar(Max)
+  financialYear String    @db.NVarChar(10) @map("financial_year")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  account       LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([date])
+  @@map("journal_entries")
+}
+

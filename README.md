@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FairDeals Billing
 
-## Getting Started
+A production-grade GST billing and inventory management system for Indian businesses, built with Next.js, Prisma, and MariaDB.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **GST Engine** — Automatic CGST/SGST (intra-state) vs IGST (inter-state) calculation with optional Compensation Cess
+- **Invoice Management** — Auto-numbered documents (INV, EST, PUR) with Financial Year resets
+- **Payment Tracking** — Partial payment support with real-time balance updates
+- **Inventory Control** — Stock deduction on invoicing with negative-stock prevention
+- **Pending Payments Dashboard** — Visual overview of all outstanding receivables with quick Record Payment action
+- **GSTIN Validation** — Strict format validation for all party identifiers
+
+## Tech Stack
+
+| Layer       | Technology                          |
+|-------------|-------------------------------------|
+| Frontend    | Next.js 15 (App Router), TypeScript |
+| Styling     | Tailwind CSS                        |
+| ORM         | Prisma                              |
+| Database    | MariaDB 10.x / MySQL 8.0+           |
+| Validation  | Zod                                 |
+| Icons       | Lucide React                        |
+
+## Project Structure
+
+```
+fairdeals-billing/
+├── prisma/
+│   └── schema.prisma          # Database schema (ORM layer)
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── invoices/      # Invoice CRUD + create
+│   │   │   ├── payments/      # Record payment endpoint
+│   │   │   ├── products/      # Product & stock management
+│   │   │   └── parties/       # Customer/supplier endpoints
+│   │   ├── dashboard/         # Pending payments dashboard
+│   │   └── layout.tsx
+│   ├── components/
+│   │   └── PendingPaymentsDashboard.tsx
+│   ├── lib/
+│   │   ├── db.ts              # Prisma client singleton
+│   │   ├── gst.ts             # GST calculation engine
+│   │   ├── docNumber.ts       # Auto-numbering logic
+│   │   └── validators.ts      # Zod schemas
+│   └── types/
+│       └── index.ts           # Shared TypeScript types
+├── SCHEMA.md                  # Full SQL schema reference
+└── README.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Database
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Start MariaDB and create the database
+mysql -u root -p -e "CREATE DATABASE fairdeals CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
 
-## Learn More
+### 2. Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.example .env
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+DATABASE_URL="mysql://root:password@localhost:3306/fairdeals"
+BUSINESS_STATE_CODE="07"
+BUSINESS_GSTIN="07XXXXX..."
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Install & Run
 
-## Deploy on Vercel
+```bash
+npm install
+npx prisma generate
+npx prisma db push
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard) for the Pending Payments Dashboard.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## GST Calculation Logic
+
+```
+Same State (party_state_code == business_state_code):
+  CGST = taxable_value × (gst_rate / 2)
+  SGST = taxable_value × (gst_rate / 2)
+  IGST = 0
+
+Different State:
+  IGST = taxable_value × gst_rate
+
+Cess (if enabled):
+  Cess = taxable_value × cess_rate
+
+Total = subtotal + CGST + SGST + IGST + Cess
+```
+
+## Document Numbering
+
+Format: `{PREFIX}/{FY}/{SEQUENCE}`
+
+- `INV/2024-25/0001` — First invoice of FY 2024-25
+- `EST/2024-25/0042` — 42nd estimate
+- Financial year resets automatically on April 1st
+
+## API Endpoints
+
+| Method | Endpoint                    | Description                     |
+|--------|-----------------------------|---------------------------------|
+| GET    | `/api/invoices`             | List invoices (filter by status) |
+| POST   | `/api/invoices`             | Create new invoice              |
+| GET    | `/api/invoices/[id]`        | Get invoice detail              |
+| POST   | `/api/payments`             | Record payment for invoice      |
+| GET    | `/api/parties`              | List customers/suppliers        |
+| POST   | `/api/parties`              | Create party                    |
+| GET    | `/api/products`             | List products with stock        |
+| POST   | `/api/products`             | Create product                  |
+| PATCH  | `/api/products/[id]/stock`  | Adjust stock manually           |
+
+## GSTIN Format
+
+```
+Format: 2-digit state code + 10-char PAN + 1 entity + Z + 1 checksum
+Example: 07AABCS1429B1ZB
+Regex:   /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
+```
