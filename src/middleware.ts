@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const USERNAME = process.env.AUTH_USERNAME!;
-const PASSWORD = process.env.AUTH_PASSWORD!;
-
 export function middleware(req: NextRequest) {
+  const USERNAME = process.env.AUTH_USERNAME;
+  const PASSWORD = process.env.AUTH_PASSWORD;
+
+  if (!USERNAME || !PASSWORD) {
+    return new NextResponse("Server misconfiguration: auth credentials not set.", { status: 500 });
+  }
+
   const authHeader = req.headers.get("authorization");
 
-  if (authHeader) {
-    const base64 = authHeader.split(" ")[1];
-    const decoded = Buffer.from(base64, "base64").toString("utf-8");
-    const [user, pass] = decoded.split(":");
+  if (authHeader?.startsWith("Basic ")) {
+    const base64 = authHeader.slice(6);
+    const decoded = atob(base64);
+    const colon = decoded.indexOf(":");
+    const user = decoded.slice(0, colon);
+    const pass = decoded.slice(colon + 1);
 
     if (user === USERNAME && pass === PASSWORD) {
       return NextResponse.next();

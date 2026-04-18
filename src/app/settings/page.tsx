@@ -19,7 +19,7 @@ type BackupType = "json" | "sql";
 
 export default function SettingsPage() {
   const [downloading, setDownloading] = useState<BackupType | null>(null);
-  const [saveToDisk, setSaveToDisk] = useState(false);
+  const [saveToDisk] = useState(false);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
 
   // Business Profile
@@ -174,15 +174,12 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Options */}
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <div
-                    onClick={() => setSaveToDisk(!saveToDisk)}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${saveToDisk ? "bg-emerald-600" : "bg-slate-700"}`}
-                  >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${saveToDisk ? "translate-x-5" : "translate-x-0.5"}`} />
+                <label className="flex items-center gap-3 cursor-pointer opacity-40 pointer-events-none" title="Not available on Vercel serverless">
+                  <div className="relative w-10 h-5 rounded-full transition-colors bg-slate-700">
+                    <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow translate-x-0.5" />
                   </div>
                   <span className="text-sm text-slate-400">
-                    Also save to <code className="font-mono text-xs bg-slate-800 px-1 rounded">backups/</code> folder on this server
+                    Save to server disk <span className="text-xs text-slate-600">(unavailable on Vercel)</span>
                   </span>
                 </label>
 
@@ -230,34 +227,31 @@ export default function SettingsPage() {
 
                 <div className="space-y-3 text-sm text-slate-400">
                   <div className="space-y-1">
-                    <p className="text-amber-400 font-semibold text-xs uppercase tracking-wide">Option A — Restore from SQL backup</p>
+                    <p className="text-amber-400 font-semibold text-xs uppercase tracking-wide">Option A — Restore from JSON backup</p>
                     <div className="rounded-xl bg-[#0a0c10] border border-slate-800 p-3 font-mono text-xs text-emerald-300 space-y-1">
-                      <p># 1. Re-create the database if needed</p>
-                      <p>mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS fairdeals;"</p>
-                      <p className="mt-1"># 2. Import the SQL file</p>
-                      <p>mysql -u root -p fairdeals {"<"} fairdeals_backup_YYYY-MM-DD.sql</p>
+                      <p># Import JSON backup via the restore endpoint</p>
+                      <p>curl -X POST https://billing.fairdeals365.com/api/backup \</p>
+                      <p>{"  "}-H "Content-Type: application/json" \</p>
+                      <p>{"  "}--data @fairdeals_backup_YYYY-MM-DD.json</p>
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-amber-400 font-semibold text-xs uppercase tracking-wide">Option B — Fresh install + push schema</p>
+                    <p className="text-amber-400 font-semibold text-xs uppercase tracking-wide">Option B — Re-sync schema to Azure SQL</p>
                     <div className="rounded-xl bg-[#0a0c10] border border-slate-800 p-3 font-mono text-xs text-emerald-300 space-y-1">
-                      <p># 1. Install dependencies</p>
-                      <p>npm install</p>
-                      <p className="mt-1"># 2. Push schema without wiping data</p>
-                      <p>npx prisma db push --accept-data-loss</p>
-                      <p className="mt-1"># 3. Start the app</p>
-                      <p>start-billing.bat</p>
+                      <p># Run locally with Azure DATABASE_URL in .env</p>
+                      <p>npx prisma db push</p>
+                      <p className="mt-1"># Then redeploy on Vercel</p>
+                      <p>git push origin master</p>
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-amber-400 font-semibold text-xs uppercase tracking-wide">Revert broken code changes</p>
+                    <p className="text-amber-400 font-semibold text-xs uppercase tracking-wide">Option C — Revert broken code</p>
                     <div className="rounded-xl bg-[#0a0c10] border border-slate-800 p-3 font-mono text-xs text-emerald-300 space-y-1">
-                      <p>git stash         # temporarily shelve uncommitted changes</p>
-                      <p>git checkout .    # discard all uncommitted edits</p>
-                      <p>git log --oneline # find a good commit to revert to</p>
-                      <p>git reset --hard {"<"}commit-hash{">"}</p>
+                      <p>git log --oneline          # find a good commit</p>
+                      <p>git reset --hard {"<"}commit{">"} # revert to it</p>
+                      <p>git push --force origin master # redeploy on Vercel</p>
                     </div>
                   </div>
                 </div>
@@ -307,9 +301,9 @@ export default function SettingsPage() {
                     detail: "Server errors are logged to logs/error.log for post-crash diagnosis.",
                   },
                   {
-                    ok: false,
-                    label: "Change default DB password",
-                    detail: "Ensure your MariaDB root password is not the default. Update DATABASE_URL in .env accordingly.",
+                    ok: true,
+                    label: "Azure SQL Database secured",
+                    detail: "Database hosted on Azure with firewall rules. SQL auth credentials stored in Vercel environment variables.",
                   },
                 ].map((item) => (
                   <li key={item.label} className="flex items-start gap-3">
@@ -328,30 +322,28 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Process Management */}
+          {/* Deployment */}
           <section className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Process Management</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Deployment</h2>
             <div className="rounded-2xl border border-slate-800 bg-[#0a0c10] p-6 space-y-4">
               <div className="flex items-center gap-3">
                 <Terminal size={18} className="text-slate-400 shrink-0" />
-                <h3 className="text-base font-bold text-white">Auto-Restart & Crash Recovery</h3>
+                <h3 className="text-base font-bold text-white">Vercel + Azure SQL</h3>
               </div>
               <p className="text-sm text-slate-400">
-                The <code className="font-mono text-xs bg-slate-800 px-1 rounded">start-billing.bat</code> script now includes a restart loop — if the app crashes it automatically restarts within 3 seconds.
+                This app is deployed on Vercel (frontend + API) with Azure SQL Database (free tier, 32 GB). Every push to <code className="font-mono text-xs bg-slate-800 px-1 rounded">master</code> triggers an automatic redeploy.
               </p>
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Optional: use PM2 for production-grade process management</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Deploy a new version</p>
                 <div className="rounded-xl bg-[#0f1117] border border-slate-800 p-3 font-mono text-xs text-emerald-300 space-y-1">
-                  <p>npm install -g pm2</p>
-                  <p>pm2 start "npm run start" --name fairdeals</p>
-                  <p>pm2 startup          # auto-start on Windows boot</p>
-                  <p>pm2 save             # save current process list</p>
-                  <p>pm2 logs fairdeals   # tail live logs</p>
+                  <p>git add -A</p>
+                  <p>git commit -m "your change"</p>
+                  <p>git push origin master   # Vercel auto-deploys</p>
                 </div>
               </div>
               <div className="flex items-start gap-2 text-xs text-slate-500">
                 <Info size={13} className="mt-0.5 shrink-0" />
-                <span>Run <code className="font-mono bg-slate-800 px-1 rounded">npm run build</code> before using PM2 or production mode.</span>
+                <span>View live logs at <code className="font-mono bg-slate-800 px-1 rounded">vercel.com → fairdeals → Deployments</code></span>
               </div>
             </div>
           </section>
