@@ -23,8 +23,10 @@ import {
   Plus,
   Edit,
   Trash2,
+  Mic,
 } from "lucide-react";
 import Link from "next/link";
+import { useVoiceSearch } from "@/hooks/useVoiceSearch";
 
 type InvoiceStatus = "UNPAID" | "PARTIAL" | "PAID";
 type PaymentMethod = "UPI" | "CASH" | "BANK";
@@ -300,6 +302,7 @@ export default function PendingPaymentsDashboard({ variant = "dashboard" }: { va
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | InvoiceStatus>("ALL");
+  const { listening, supported: voiceSupported, startListening } = useVoiceSearch(setSearch);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -459,7 +462,14 @@ export default function PendingPaymentsDashboard({ variant = "dashboard" }: { va
               <div className="relative flex-1 max-w-sm">
                 <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
                 <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoice or customer..."
-                  className="w-full rounded-xl bg-[#0f1117] border border-slate-700/60 pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 outline-none transition-all" />
+                  className="w-full rounded-xl bg-[#0f1117] border border-slate-700/60 pl-9 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 outline-none transition-all" />
+                {voiceSupported && (
+                  <button type="button" onClick={startListening}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
+                    title={listening ? "Listening..." : "Voice search"}>
+                    <Mic size={14} />
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Filter size={13} className="text-slate-600" />

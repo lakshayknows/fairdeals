@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import {
   Package, Plus, Search, AlertTriangle,
   TrendingDown, TrendingUp,
-  X, Loader2, CheckCircle2, Pencil
+  X, Loader2, CheckCircle2, Pencil, Mic
 } from "lucide-react";
+import { useVoiceSearch } from "@/hooks/useVoiceSearch";
 
 interface GstConfig {
   id: number;
@@ -122,6 +123,7 @@ export default function ProductsView() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showLowOnly, setShowLowOnly] = useState(false);
+  const { listening, supported: voiceSupported, startListening } = useVoiceSearch(setSearch);
 
   // Adjust stock state
   const [adjustId, setAdjustId] = useState<number | null>(null);
@@ -364,7 +366,14 @@ export default function ProductsView() {
             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by name, SKU, HSN..."
-              className="w-full rounded-xl bg-[#0f1117] border border-slate-700/60 pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-indigo-500 outline-none transition-all" />
+              className="w-full rounded-xl bg-[#0f1117] border border-slate-700/60 pl-9 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-indigo-500 outline-none transition-all" />
+            {voiceSupported && (
+              <button type="button" onClick={startListening}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
+                title={listening ? "Listening..." : "Voice search"}>
+                <Mic size={14} />
+              </button>
+            )}
           </div>
           <button onClick={() => setShowLowOnly(p => !p)}
             className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-bold transition-all ${showLowOnly ? "border-amber-500/40 bg-amber-500/10 text-amber-400" : "border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600"}`}>
