@@ -1,11 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export function useVoiceSearch(onResult: (text: string) => void) {
   const [listening, setListening] = useState(false);
+  const [supported, setSupported] = useState(false);
 
-  const supported =
-    typeof window !== "undefined" &&
-    !!(window.SpeechRecognition || (window as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition);
+  useEffect(() => {
+    setSupported(
+      !!(window.SpeechRecognition || (window as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition)
+    );
+  }, []);
 
   const startListening = useCallback(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
