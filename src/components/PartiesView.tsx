@@ -55,7 +55,7 @@ export default function PartiesView() {
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "CUSTOMER" | "SUPPLIER">("ALL");
-  const { listening, supported: voiceSupported, startListening } = useVoiceSearch(setSearch);
+  const { listening, supported: voiceSupported, error: voiceError, startListening, stopListening } = useVoiceSearch(setSearch);
 
   // Add modal
   const [showAdd, setShowAdd] = useState(false);
@@ -416,9 +416,9 @@ export default function PartiesView() {
               placeholder="Search party or GSTIN..."
               className="w-full rounded-xl bg-[#0f1117] border border-slate-700/60 pl-9 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-indigo-500 outline-none transition-all" />
             {voiceSupported && (
-              <button type="button" onClick={startListening}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
-                title={listening ? "Listening..." : "Voice search"}>
+              <button type="button" onClick={listening ? stopListening : startListening}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${voiceError ? "text-amber-400" : listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
+                title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : listening ? "Click to stop" : "Voice search"}>
                 <Mic size={14} />
               </button>
             )}

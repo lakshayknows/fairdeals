@@ -123,7 +123,7 @@ export default function ProductsView() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showLowOnly, setShowLowOnly] = useState(false);
-  const { listening, supported: voiceSupported, startListening } = useVoiceSearch(setSearch);
+  const { listening, supported: voiceSupported, error: voiceError, startListening, stopListening } = useVoiceSearch(setSearch);
 
   // Adjust stock state
   const [adjustId, setAdjustId] = useState<number | null>(null);
@@ -368,9 +368,9 @@ export default function ProductsView() {
               placeholder="Search by name, SKU, HSN..."
               className="w-full rounded-xl bg-[#0f1117] border border-slate-700/60 pl-9 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-indigo-500 outline-none transition-all" />
             {voiceSupported && (
-              <button type="button" onClick={startListening}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
-                title={listening ? "Listening..." : "Voice search"}>
+              <button type="button" onClick={listening ? stopListening : startListening}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${voiceError ? "text-amber-400" : listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
+                title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : listening ? "Click to stop" : "Voice search"}>
                 <Mic size={14} />
               </button>
             )}
