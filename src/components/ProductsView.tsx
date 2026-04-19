@@ -8,12 +8,6 @@ import {
 } from "lucide-react";
 import { useVoiceSearch } from "@/hooks/useVoiceSearch";
 
-interface GstConfig {
-  id: number;
-  name: string;
-  cgstRate: number;
-}
-
 interface Product {
   id: number;
   sku: string;
@@ -190,7 +184,7 @@ export default function ProductsView() {
     }
   };
 
-  const handleAddSubmit = async (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setAdding(true);
     try {
@@ -247,7 +241,7 @@ export default function ProductsView() {
     setEditProduct(product);
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!editProduct) return;
     setSaving(true);
@@ -370,7 +364,7 @@ export default function ProductsView() {
             {voiceSupported && (
               <button type="button" onClick={listening ? stopListening : startListening}
                 className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${voiceError ? "text-amber-400" : listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
-                title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : listening ? "Click to stop" : "Voice search"}>
+                title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : voiceError === "brave-blocked" ? "Blocked by Brave — enable in Shields settings or use Chrome" : listening ? "Click to stop" : "Voice search"}>
                 <Mic size={14} />
               </button>
             )}

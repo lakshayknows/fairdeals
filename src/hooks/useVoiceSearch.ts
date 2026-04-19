@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
-export type VoiceError = "not-allowed" | "no-speech" | "unsupported" | null;
+export type VoiceError = "not-allowed" | "no-speech" | "unsupported" | "brave-blocked" | null;
 
 export function useVoiceSearch(onResult: (text: string) => void) {
   const [listening, setListening] = useState(false);
@@ -43,9 +43,10 @@ export function useVoiceSearch(onResult: (text: string) => void) {
         setError("not-allowed");
       } else if (e.error === "no-speech") {
         setError("no-speech");
+      } else if (e.error === "service-not-allowed") {
+        setError("brave-blocked");
       }
-      // Clear error after 3 seconds
-      setTimeout(() => setError(null), 3000);
+      setTimeout(() => setError(null), 4000);
     };
 
     recognition.onresult = (event: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => {

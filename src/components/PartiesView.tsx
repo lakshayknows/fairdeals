@@ -102,7 +102,7 @@ export default function PartiesView() {
     }
   };
 
-  const handleAddSubmit = async (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setAdding(true);
     try {
@@ -151,7 +151,7 @@ export default function PartiesView() {
     setEditParty(party);
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!editParty) return;
     setSaving(true);
@@ -418,7 +418,7 @@ export default function PartiesView() {
             {voiceSupported && (
               <button type="button" onClick={listening ? stopListening : startListening}
                 className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${voiceError ? "text-amber-400" : listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
-                title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : listening ? "Click to stop" : "Voice search"}>
+                title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : voiceError === "brave-blocked" ? "Blocked by Brave — enable in Shields settings or use Chrome" : listening ? "Click to stop" : "Voice search"}>
                 <Mic size={14} />
               </button>
             )}
@@ -528,7 +528,7 @@ function PartyFormModal({
   form: { type: string; name: string; gstin: string; phone: string; email: string; address: string; stateCode: string };
   onChange: (f: any) => void;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.SyntheticEvent) => void;
   submitting: boolean;
   submitLabel: string;
 }) {

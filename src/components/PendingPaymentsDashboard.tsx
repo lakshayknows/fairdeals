@@ -466,7 +466,7 @@ export default function PendingPaymentsDashboard({ variant = "dashboard" }: { va
                 {voiceSupported && (
                   <button type="button" onClick={listening ? stopListening : startListening}
                     className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${voiceError ? "text-amber-400" : listening ? "text-red-400 animate-pulse" : "text-slate-500 hover:text-indigo-400"}`}
-                    title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : listening ? "Click to stop" : "Voice search"}>
+                    title={voiceError === "not-allowed" ? "Microphone permission denied" : voiceError === "no-speech" ? "No speech detected" : voiceError === "brave-blocked" ? "Blocked by Brave — enable in Shields settings or use Chrome" : listening ? "Click to stop" : "Voice search"}>
                     <Mic size={14} />
                   </button>
                 )}
