@@ -5,9 +5,9 @@ export function useVoiceSearch(onResult: (text: string) => void) {
   const [supported, setSupported] = useState(false);
 
   useEffect(() => {
-    setSupported(
-      !!(window.SpeechRecognition || (window as Window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition)
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
   }, []);
 
   const startListening = useCallback(() => {
