@@ -32,12 +32,14 @@ const CESS_RATES = [0, 1, 3, 12, 15, 17, 21, 22, 36, 60, 160, 204, 290];
 const emptyForm = {
   name: "", sku: "", hsnCode: "", basePrice: "", unit: "PCS",
   stockQty: "0", lowStockAlert: "10", gstRate: "18", cessRate: "0",
+  usageType: "INVENTORY",
 };
 
 interface ProductFormData {
   name: string; sku: string; hsnCode: string; basePrice: string;
   unit: string; stockQty: string; lowStockAlert: string;
   gstRate: string; cessRate: string;
+  usageType: string;
 }
 
 function ProductFormFields({
@@ -56,6 +58,15 @@ function ProductFormFields({
         <input required value={form.name} onChange={e => onChange({ ...form, name: e.target.value })}
           className="w-full bg-[#0f1117] border border-slate-700/60 rounded-lg px-3 py-2 text-white outline-none focus:border-indigo-500"
           placeholder="e.g. Cotton Fabric" />
+      </div>
+      <div className="col-span-2 space-y-1.5">
+        <label className="text-xs font-semibold text-slate-500 uppercase">Usage Type *</label>
+        <select required value={form.usageType} onChange={e => onChange({ ...form, usageType: e.target.value })}
+          className="w-full bg-[#0f1117] border border-slate-700/60 rounded-lg px-3 py-2 text-white outline-none focus:border-indigo-500">
+          <option value="INVENTORY">Inventory for Sale</option>
+          <option value="ASSET">Business Asset</option>
+          <option value="EXPENSE">Expense</option>
+        </select>
       </div>
       <div className="space-y-1.5">
         <label className="text-xs font-semibold text-slate-500 uppercase">SKU <span className="normal-case text-slate-600 font-normal">(optional)</span></label>
@@ -201,6 +212,7 @@ export default function ProductsView() {
           lowStockAlert: Number(addForm.lowStockAlert),
           gstRate: Number(addForm.gstRate),
           cessRate: Number(addForm.cessRate),
+          usageType: addForm.usageType,
         }),
       });
 
@@ -237,6 +249,7 @@ export default function ProductsView() {
       lowStockAlert: String(product.lowStockAlert),
       gstRate: String(gstRate),
       cessRate: "0",
+      usageType: "INVENTORY", // Assuming we didn't add it to product type yet, this is safe fallback
     });
     setEditProduct(product);
   };
@@ -258,6 +271,7 @@ export default function ProductsView() {
           lowStockAlert: Number(editForm.lowStockAlert),
           gstRate: Number(editForm.gstRate),
           cessRate: Number(editForm.cessRate),
+          usageType: editForm.usageType,
         }),
       });
 

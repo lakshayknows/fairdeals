@@ -17,6 +17,40 @@ export function getCurrentFinancialYear(): string {
 }
 
 /**
+ * Validates if a manual document number is unique within the financial year
+ * @param docNumber The document number to check (e.g., "INV/2024-25/0001")
+ * @param financialYear The financial year to check against
+ * @returns True if the document number is available
+ */
+export async function isManualDocNumberAvailable(
+  docNumber: string,
+  financialYear?: string
+): Promise<boolean> {
+  const fy = financialYear ?? getCurrentFinancialYear();
+  
+  // Parse the document number to extract prefix and sequence
+  const parts = docNumber.split('/');
+  if (parts.length !== 3) {
+    return false; // Invalid format
+  }
+  
+  const [prefix, fyPart, sequenceStr] = parts;
+  if (fyPart !== fy) {
+    return false; // Financial year mismatch
+  }
+  
+  // Check if this document number already exists
+  const existing = await prisma.invoice.findFirst({
+    where: {
+      docNumber,
+      financialYear: fy
+    }
+  });
+  
+  return !existing; // Available if no existing invoice found
+}
+
+/**
  * Atomically increments the sequence counter for a given prefix+FY
  * and returns the formatted document number.
  *
@@ -43,6 +77,23 @@ export async function getNextDocNumber(
   const seq = sequence.lastNumber;
   const padded = String(seq).padStart(4, "0");
   return `${prefix}/${fy}/${padded}`;
+}
+
+/**
+ * Gets the next available sequence number for a prefix+FY combination
+ * without incrementing it (used for manual number validation)
+ */
+export async function getCurrentSequenceNumber(
+  prefix: string,
+  financialYear?: string
+): Promise<number> {
+  const fy = financialYear ?? getCurrentFinancialYear();
+  
+  const sequence = await prisma.docSequence.findUnique({
+    where: { prefix_financialYear: { prefix, financialYear: fy } }
+  });
+  
+  return sequence ? sequence.lastNumber : 0;
 }
 
 export const DOC_PREFIXES = {

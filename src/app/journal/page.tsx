@@ -48,6 +48,9 @@ export default function JournalPage() {
             <BookOpen size={16} className="text-indigo-400" />
             Journal Entries
           </h1>
+          <a href="/journal/new" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs font-bold text-white shadow-lg transition-colors">
+            + New Entry
+          </a>
         </header>
 
         <div className="p-8 overflow-y-auto flex-1">

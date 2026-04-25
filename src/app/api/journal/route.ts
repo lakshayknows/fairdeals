@@ -8,11 +8,14 @@ const createJournalEntrySchema = z.object({
     accountId: z.number().int().positive(),
     amount: z.number().positive(),
     type: z.enum(["DEBIT", "CREDIT"]),
+    narration: z.string().max(500).optional().nullable(),
   })).min(2, "At least two entries are required for double-entry bookkeeping"),
   referenceType: z.string().max(50).optional().nullable(),
   referenceId: z.number().int().optional().nullable(),
   description: z.string().optional().nullable(),
   financialYear: z.string().max(10),
+  // For manual JV, we might want to add ITC reversal flag
+  reverseItc: z.boolean().default(false),
 });
 
 export async function GET(req: NextRequest) {

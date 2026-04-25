@@ -50,6 +50,8 @@ export const createProductSchema = z.object({
   lowStockAlert: z.number().min(0).default(10),
   allowNegativeStock: z.boolean().default(false),
   unit: z.string().max(20).default("PCS"),
+  usageType: z.enum(["INVENTORY", "ASSET", "EXPENSE"]).default("INVENTORY"),
+  expenseAccountId: z.number().int().positive().optional().nullable(),
 });
 
 // ─── Invoice ─────────────────────────────────────────────────────────────────
@@ -75,6 +77,12 @@ export const createInvoiceSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
   affectStock: z.boolean().default(true).optional(),
   financialYear: z.string().max(10).optional(),
+  // Optional manual document number override
+  docNumber: z
+    .string()
+    .regex(/^[A-Z]{2,5}\/\d{4}-\d{2}\/\d{4}$/, "Document number must be in format PREFIX/FY/SEQUENCE (e.g., INV/2024-25/0001)")
+    .optional()
+    .nullable(),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required"),
 });
 

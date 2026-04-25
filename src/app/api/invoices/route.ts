@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createInvoiceSchema, invoiceListQuerySchema } from "@/lib/validators";
 import { calcLineItem, calcInvoiceTotals, isIntraState } from "@/lib/gst";
-import { getNextDocNumber, DOC_PREFIXES } from "@/lib/docNumber";
+import { getNextDocNumber, isManualDocNumberAvailable, DOC_PREFIXES } from "@/lib/docNumber";
 import { logError } from "@/lib/logger";
 import { checkRateLimit, rateLimitKey } from "@/lib/rateLimit";
+import { getStandardAccount, postJournalEntry } from "@/lib/ledgerUtils";
 
 const BUSINESS_STATE_CODE = process.env.BUSINESS_STATE_CODE ?? "07";
 
@@ -143,11 +144,28 @@ export async function POST(req: NextRequest) {
       return { ...item, ...result };
     });
 
-    const totals = calcInvoiceTotals(calculatedItems);
+     const totals = calcInvoiceTotals(calculatedItems);
 
-    // Generate document number
-    const prefix = DOC_PREFIXES[docType] ?? "INV";
-    const docNumber = await getNextDocNumber(prefix, parsed.data.financialYear);
+     // Determine document number (manual override or auto-generated)
+     let docNumber: string;
+     if (parsed.data.docNumber) {
+       // Validate the manual document number
+       const isAvailable = await isManualDocNumberAvailable(
+         parsed.data.docNumber,
+         parsed.data.financialYear
+       );
+       if (!isAvailable) {
+         return NextResponse.json(
+           { error: "Document number already exists or invalid format" },
+           { status: 400 }
+         );
+       }
+       docNumber = parsed.data.docNumber.toUpperCase();
+     } else {
+       // Auto-generate document number
+       const prefix = DOC_PREFIXES[docType] ?? "INV";
+       docNumber = await getNextDocNumber(prefix, parsed.data.financialYear);
+     }
 
     // Create invoice in a transaction (also deducts stock)
     const invoice = await prisma.$transaction(async (tx) => {
@@ -223,11 +241,52 @@ export async function POST(req: NextRequest) {
           where: { id: partyId },
           data: { currentBalance: { increment: totals.totalAmount } },
         });
+
+        // GL Postings for Sales Invoice
+        const partyAcc = await getStandardAccount(tx as any, `Party - ${party.name}`, "ASSET", "Accounts Receivable");
+        const salesAcc = await getStandardAccount(tx as any, "Sales Account", "INCOME", "Direct Income");
+        
+        await postJournalEntry(tx as any, { date: new Date(date), accountId: partyAcc.id, amount: Number(totals.totalAmount), type: "DEBIT", referenceType: "INVOICE", referenceId: inv.id, description: `Invoice ${docNumber}`, financialYear: parsed.data.financialYear || "" });
+        await postJournalEntry(tx as any, { date: new Date(date), accountId: salesAcc.id, amount: Number(totals.subtotal), type: "CREDIT", referenceType: "INVOICE", referenceId: inv.id, description: `Invoice ${docNumber}`, financialYear: parsed.data.financialYear || "" });
+        
+        if (Number(totals.cgstTotal) > 0) {
+          const cgstAcc = await getStandardAccount(tx as any, "Output CGST", "LIABILITY", "Duties and Taxes");
+          await postJournalEntry(tx as any, { date: new Date(date), accountId: cgstAcc.id, amount: Number(totals.cgstTotal), type: "CREDIT", referenceType: "INVOICE", referenceId: inv.id, financialYear: parsed.data.financialYear || "" });
+        }
+        if (Number(totals.sgstTotal) > 0) {
+          const sgstAcc = await getStandardAccount(tx as any, "Output SGST", "LIABILITY", "Duties and Taxes");
+          await postJournalEntry(tx as any, { date: new Date(date), accountId: sgstAcc.id, amount: Number(totals.sgstTotal), type: "CREDIT", referenceType: "INVOICE", referenceId: inv.id, financialYear: parsed.data.financialYear || "" });
+        }
+        if (Number(totals.igstTotal) > 0) {
+          const igstAcc = await getStandardAccount(tx as any, "Output IGST", "LIABILITY", "Duties and Taxes");
+          await postJournalEntry(tx as any, { date: new Date(date), accountId: igstAcc.id, amount: Number(totals.igstTotal), type: "CREDIT", referenceType: "INVOICE", referenceId: inv.id, financialYear: parsed.data.financialYear || "" });
+        }
+
       } else if (docType === "PURCHASE" || docType === "CREDIT_NOTE") {
         await tx.party.update({
           where: { id: partyId },
           data: { currentBalance: { decrement: totals.totalAmount } },
         });
+
+        // GL Postings for Purchases
+        const partyAcc = await getStandardAccount(tx as any, `Party - ${party.name}`, "LIABILITY", "Accounts Payable");
+        const purchaseAcc = await getStandardAccount(tx as any, "Purchases Account", "EXPENSE", "Direct Expenses");
+
+        await postJournalEntry(tx as any, { date: new Date(date), accountId: partyAcc.id, amount: Number(totals.totalAmount), type: "CREDIT", referenceType: "PURCHASE", referenceId: inv.id, description: `Purchase ${docNumber}`, financialYear: parsed.data.financialYear || "" });
+        await postJournalEntry(tx as any, { date: new Date(date), accountId: purchaseAcc.id, amount: Number(totals.subtotal), type: "DEBIT", referenceType: "PURCHASE", referenceId: inv.id, description: `Purchase ${docNumber}`, financialYear: parsed.data.financialYear || "" });
+        
+        if (Number(totals.cgstTotal) > 0) {
+          const cgstAcc = await getStandardAccount(tx as any, "Input CGST", "ASSET", "Current Assets");
+          await postJournalEntry(tx as any, { date: new Date(date), accountId: cgstAcc.id, amount: Number(totals.cgstTotal), type: "DEBIT", referenceType: "PURCHASE", referenceId: inv.id, financialYear: parsed.data.financialYear || "" });
+        }
+        if (Number(totals.sgstTotal) > 0) {
+          const sgstAcc = await getStandardAccount(tx as any, "Input SGST", "ASSET", "Current Assets");
+          await postJournalEntry(tx as any, { date: new Date(date), accountId: sgstAcc.id, amount: Number(totals.sgstTotal), type: "DEBIT", referenceType: "PURCHASE", referenceId: inv.id, financialYear: parsed.data.financialYear || "" });
+        }
+        if (Number(totals.igstTotal) > 0) {
+          const igstAcc = await getStandardAccount(tx as any, "Input IGST", "ASSET", "Current Assets");
+          await postJournalEntry(tx as any, { date: new Date(date), accountId: igstAcc.id, amount: Number(totals.igstTotal), type: "DEBIT", referenceType: "PURCHASE", referenceId: inv.id, financialYear: parsed.data.financialYear || "" });
+        }
       }
 
       return inv;

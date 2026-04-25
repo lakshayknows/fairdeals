@@ -8,6 +8,7 @@ import {
   Package, Sparkles, ArrowRight, X,
 } from "lucide-react";
 import { INDIAN_STATES } from "@/types";
+import { getCurrentFinancialYear } from "@/lib/docNumber";
 import type { CalcResponse } from "@/app/api/invoices/calculate/route";
 
 export async function calculateInvoice(payload: {
@@ -137,8 +138,12 @@ export default function NewInvoiceForm({ initialData }: { initialData?: any }) {
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
-  const [fy, setFy] = useState("2024-25");
+   const [isDirty, setIsDirty] = useState(false);
+   const [fy, setFy] = useState("2024-25");
+   const [docNumberMode, setDocNumberMode] = useState<'auto' | 'manual'>('auto');
+   const [manualDocNumber, setManualDocNumber] = useState('');
+   const [docNumberError, setDocNumberError] = useState<string | null>(null);
+   const [docNumberValidating, setDocNumberValidating] = useState(false);
 
   // Warning Modal State
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -148,7 +153,35 @@ export default function NewInvoiceForm({ initialData }: { initialData?: any }) {
     if (saved) setFy(saved);
   }, []);
 
-  useEffect(() => { setIsDirty(true); }, [docType, date, dueDate, partyName, partyGstin, partyStateCode, notes, items]);
+   useEffect(() => { setIsDirty(true); }, [docType, date, dueDate, partyName, partyGstin, partyStateCode, notes, items]);
+
+   // Validate manual document number in real-time
+   useEffect(() => {
+     if (docNumberMode === 'manual' && manualDocNumber.trim() !== '') {
+       setDocNumberValidating(true);
+       setDocNumberError(null);
+       
+       // Import the validation function dynamically to avoid circular dependencies
+       import('@/lib/docNumber').then(({ isManualDocNumberAvailable }) => {
+         const fy = localStorage.getItem('financial-year') || getCurrentFinancialYear();
+         isManualDocNumberAvailable(manualDocNumber, fy).then((isAvailable) => {
+           setDocNumberValidating(false);
+           if (!isAvailable) {
+             setDocNumberError('Document number already exists or invalid format');
+           }
+         }).catch(() => {
+           setDocNumberValidating(false);
+           setDocNumberError('Validation failed');
+         });
+       }).catch(() => {
+         setDocNumberValidating(false);
+         setDocNumberError('Failed to load validation');
+       });
+     } else {
+       setDocNumberError(null);
+       setDocNumberValidating(false);
+     }
+   }, [docNumberMode, manualDocNumber]);
 
   useEffect(() => {
     const readyItems = items.filter(
@@ -205,59 +238,80 @@ export default function NewInvoiceForm({ initialData }: { initialData?: any }) {
     }
   };
 
-  const executeSave = async (retainHistoric: boolean) => {
-    setShowWarningModal(false);
-    setSaving(true);
-    setSaveError(null);
+     const executeSave = async (retainHistoric: boolean) => {
+     setShowWarningModal(false);
+     
+     // Validate document number if in manual mode
+     let docNumberToUse: string | null = null;
+     if (docNumberMode === 'manual') {
+       if (!manualDocNumber.trim()) {
+         setSaveError("Please enter a document number");
+         return;
+       }
+       
+       // Final validation
+       const fy = localStorage.getItem('financial-year') || getCurrentFinancialYear();
+       const isAvailable = await isManualDocNumberAvailable(manualDocNumber, fy);
+       if (!isAvailable) {
+         setSaveError('Document number already exists or invalid format');
+         return;
+       }
+       
+       docNumberToUse = manualDocNumber.trim().toUpperCase();
+     }
+     
+     setSaving(true);
+     setSaveError(null);
 
-    let finalPartyId = partyId;
-    if (!finalPartyId) {
-      const stateObj = INDIAN_STATES.find(s => s.code === partyStateCode);
-      const stateName = stateObj ? stateObj.name : "Delhi";
-      const pRes = await fetch("/api/parties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: docType === "PURCHASE" ? "SUPPLIER" : "CUSTOMER", name: partyName, gstin: partyGstin || null, stateCode: partyStateCode, stateName })
-      });
-      if (pRes.ok) {
-        const newParty = await pRes.json();
-        finalPartyId = newParty.id;
-      } else {
-        setSaveError("Failed to create party.");
-        setSaving(false);
-        return;
-      }
-    }
+     let finalPartyId = partyId;
+     if (!finalPartyId) {
+       const stateObj = INDIAN_STATES.find(s => s.code === partyStateCode);
+       const stateName = stateObj ? stateObj.name : "Delhi";
+       const pRes = await fetch("/api/parties", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ type: docType === "PURCHASE" ? "SUPPLIER" : "CUSTOMER", name: partyName, gstin: partyGstin || null, stateCode: partyStateCode, stateName })
+       });
+       if (pRes.ok) {
+         const newParty = await pRes.json();
+         finalPartyId = newParty.id;
+       } else {
+         setSaveError("Failed to create party.");
+         setSaving(false);
+         return;
+       }
+     }
 
-    const readyItems = items.filter(i => i.productId && parseFloat(i.qty) > 0 && parseFloat(i.unitPrice) > 0);
-    const bodyPayload = {
-      docType, date, dueDate: dueDate || null, partyId: finalPartyId, notes, affectStock,
-      retainHistoric,
-      financialYear: typeof window !== "undefined" ? localStorage.getItem("financial-year") || undefined : undefined,
-      items: readyItems.map(i => ({
-        productId: parseInt(i.productId, 10), qty: parseFloat(i.qty), unitPrice: parseFloat(i.unitPrice), discountPct: parseFloat(i.discountPct) || 0
-      })),
-    };
+     const readyItems = items.filter(i => i.productId && parseFloat(i.qty) > 0 && parseFloat(i.unitPrice) > 0);
+     const bodyPayload = {
+       docType, date, dueDate: dueDate || null, partyId: finalPartyId, notes, affectStock,
+       retainHistoric,
+       financialYear: typeof window !== "undefined" ? localStorage.getItem("financial-year") || undefined : undefined,
+       ...(docNumberToUse !== null ? { docNumber: docNumberToUse } : {}),
+       items: readyItems.map(i => ({
+         productId: parseInt(i.productId, 10), qty: parseFloat(i.qty), unitPrice: parseFloat(i.unitPrice), discountPct: parseFloat(i.discountPct) || 0
+       })),
+     };
 
-    const res = await fetch(initialData ? `/api/invoices/${initialData.id}` : "/api/invoices", {
-      method: initialData ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bodyPayload),
-    });
+     const res = await fetch(initialData ? `/api/invoices/${initialData.id}` : "/api/invoices", {
+       method: initialData ? "PUT" : "POST",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify(bodyPayload),
+     });
 
-    if (res.ok) {
-      setIsDirty(false);
-      startTransition(() => router.push(initialData ? `/invoices/${initialData.id}/print` : "/invoices"));
-    } else {
-      try {
-        const data = await res.json();
-        setSaveError(data.error?.slice(0, 100) || "Validation failed");
-      } catch (e) {
-        setSaveError("Failed to save invoice");
-      }
-    }
-    setSaving(false);
-  };
+     if (res.ok) {
+       setIsDirty(false);
+       startTransition(() => router.push(initialData ? `/invoices/${initialData.id}/print` : "/invoices"));
+     } else {
+       try {
+         const data = await res.json();
+         setSaveError(data.error?.slice(0, 100) || "Validation failed");
+       } catch (e) {
+         setSaveError("Failed to save invoice");
+       }
+     }
+     setSaving(false);
+   };
 
   const DOC_LABEL: Record<DocType, string> = {
     INVOICE: "Tax Invoice", ESTIMATE: "Estimate", PURCHASE: "Purchase Bill",
@@ -462,15 +516,61 @@ export default function NewInvoiceForm({ initialData }: { initialData?: any }) {
                     />
                   </Field>
                 </div>
-                <Field label="Auto Document No." mono>
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2.5">
-                    <span className="text-xs font-mono text-slate-600">
-                      {docType === "INVOICE" ? "INV" : docType === "ESTIMATE" ? "EST" : "PUR"}
-                      /{fy}/
-                    </span>
-                    <span className="text-xs font-mono text-indigo-500 animate-pulse">AUTO</span>
-                  </div>
-                </Field>
+                 <Field label="Document Number">
+                   <div className="flex items-center gap-3">
+                     <label className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                       <input
+                         type="radio"
+                         checked={docNumberMode === 'auto'}
+                         onChange={() => {
+                           setDocNumberMode('auto');
+                           setManualDocNumber('');
+                           setDocNumberError(null);
+                         }}
+                         className="h-4 w-4 text-indigo-600"
+                       />
+                       Auto
+                     </label>
+                     <label className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                       <input
+                         type="radio"
+                         checked={docNumberMode === 'manual'}
+                         onChange={() => setDocNumberMode('manual')}
+                         className="h-4 w-4 text-indigo-600"
+                       />
+                       Manual
+                     </label>
+                   </div>
+                   {docNumberMode === 'auto' ? (
+                     <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2.5 mt-2">
+                       <span className="text-xs font-mono text-slate-600">
+                         {docType === "INVOICE" ? "INV" : docType === "ESTIMATE" ? "EST" : "PUR"}
+                         /{fy}/
+                       </span>
+                       <span className="text-xs font-mono text-indigo-500 animate-pulse">AUTO</span>
+                     </div>
+                   ) : (
+                     <>
+                       <div className="relative mt-2">
+                         <input
+                           type="text"
+                           value={manualDocNumber}
+                           onChange={(e) => setManualDocNumber(e.target.value.trim().toUpperCase())}
+                           className={inputCls + " font-mono w-full"}
+                           placeholder="e.g., INV/2024-25/0001"
+                         />
+                         {docNumberValidating && (
+                           <div className="absolute left-0 top-full mt-1 w-full">
+                             <Loader2 size={11} className="text-indigo-500 animate-spin" />
+                           </div>
+                         )}
+                       </div>
+                       {docNumberError && (
+                         <p className="mt-1 text-xs text-red-400">{docNumberError}</p>
+                       )}
+                     </>
+                   )}
+                 </Field>
                 <Field label="Notes">
                   <textarea
                     value={notes}

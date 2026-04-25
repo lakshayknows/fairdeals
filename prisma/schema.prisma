@@ -32,10 +32,13 @@ model Product {
   lowStockAlert      Decimal       @default(10) @db.Decimal(10, 3) @map("low_stock_alert")
   allowNegativeStock Boolean       @default(false) @map("allow_negative_stock")
   unit               String        @default("PCS") @db.NVarChar(20)
+  usageType          String        @default("INVENTORY") @map("usage_type") // INVENTORY, ASSET, EXPENSE
+  expenseAccountId   Int?          @map("expense_account_id") // Link to ledger account if it's an expense
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
   gstConfig          GstConfig     @relation(fields: [gstConfigId], references: [id])
   invoiceItems       InvoiceItem[]
+  expenseAccount     LedgerAccount? @relation(fields: [expenseAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([hsnCode])
   @@map("products")
@@ -194,6 +197,7 @@ model LedgerAccount {
   journalEntries JournalEntry[]
   invoices       Invoice[]
   payments       Payment[]
+  products       Product[]
 
   @@unique([name])
   @@map("ledger_accounts")
