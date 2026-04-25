@@ -161,22 +161,15 @@ export default function NewInvoiceForm({ initialData }: { initialData?: any }) {
        setDocNumberValidating(true);
        setDocNumberError(null);
        
-       // Import the validation function dynamically to avoid circular dependencies
-       import('@/lib/docNumber').then(({ isManualDocNumberAvailable }) => {
-         const fy = localStorage.getItem('financial-year') || getCurrentFinancialYear();
-         isManualDocNumberAvailable(manualDocNumber, fy).then((isAvailable) => {
-           setDocNumberValidating(false);
-           if (!isAvailable) {
-             setDocNumberError('Document number already exists or invalid format');
-           }
-         }).catch(() => {
-           setDocNumberValidating(false);
-           setDocNumberError('Validation failed');
-         });
-       }).catch(() => {
-         setDocNumberValidating(false);
-         setDocNumberError('Failed to load validation');
-       });
+       // Instead of checking the DB on the client, we just assume it's valid format-wise for now.
+       // The server will do the final unique constraint check on submit to avoid shipping Prisma to client.
+       const regex = /^[A-Z]{2,5}\/\d{4}-\d{2}\/\d{4}$/;
+       if (!regex.test(manualDocNumber)) {
+         setDocNumberError('Format must be PREFIX/FY/SEQUENCE (e.g. INV/2024-25/0001)');
+       } else {
+         setDocNumberError(null);
+       }
+       setDocNumberValidating(false);
      } else {
        setDocNumberError(null);
        setDocNumberValidating(false);
@@ -249,14 +242,12 @@ export default function NewInvoiceForm({ initialData }: { initialData?: any }) {
          return;
        }
        
-       // Final validation
-       const fy = localStorage.getItem('financial-year') || getCurrentFinancialYear();
-       const isAvailable = await isManualDocNumberAvailable(manualDocNumber, fy);
-       if (!isAvailable) {
-         setSaveError('Document number already exists or invalid format');
+       // Final validation happens on the server now
+       const regex = /^[A-Z]{2,5}\/\d{4}-\d{2}\/\d{4}$/;
+       if (!regex.test(manualDocNumber)) {
+         setSaveError('Document number must be in format PREFIX/FY/SEQUENCE (e.g. INV/2024-25/0001)');
          return;
        }
-       
        docNumberToUse = manualDocNumber.trim().toUpperCase();
      }
      
